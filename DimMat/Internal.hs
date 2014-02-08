@@ -699,10 +699,10 @@ konst (Dimensional a) = DimMat (H.konst a
      hNat2Integral (proxy :: Proxy (HLength ones))))
 
 -- | identity matrix. The size is determined by the type.
-ident :: forall ones a _1.
-    (H.Field a, HNat2Integral (HLength ones), ones ~ (DOne ': _1)) =>
-    DimMat [ones, ones] a
-ident = DimMat (H.ident (hNat2Integral (proxy :: Proxy (HLength ones))))
+ident :: forall rs cs a _1 _2.
+    (H.Field a, HNat2Integral (HLength rs), rs ~ (DOne ': _1), cs ~ (DOne ': _2), AreRecips rs cs) =>
+    DimMat [rs, cs] a
+ident = DimMat (H.ident (hNat2Integral (proxy :: Proxy (HLength rs))))
 
 -- | zero matrix. The size and dimension is determined by the type.
 zeroes :: forall r c a _1 _2 _3. (H.Field a,
