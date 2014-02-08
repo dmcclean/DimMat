@@ -93,6 +93,7 @@ module DimMat.Internal (
    norm1, normInf,
    -- optimiseMult, mXm, mXv, vXm, (<.>),
    -- (<>), (<\>), outer, kronecker,
+   (<>),
    -- ** Random numbers
    -- ** Element conversion
    -- ** Input/Output
@@ -185,7 +186,7 @@ import qualified Numeric.NumType.TF as N
 import qualified Numeric.LinearAlgebra as H
 import qualified Numeric.LinearAlgebra.LAPACK as H
 
-import Text.PrettyPrint.ANSI.Leijen
+import Text.PrettyPrint.ANSI.Leijen hiding ((<>))
 import Data.List (transpose)
 
 import Data.HList.CommonMain hiding (MapFst)
@@ -454,6 +455,14 @@ multiply :: (H.Product a,
     -> DimMat (ri' ': cj) a
 multiply (DimMat a) (DimMat b) = DimMat (H.multiply a b)
 multiply (DimMat a) (DimVec b) = DimVec (H.mXv a b)
+
+infixl 7 <>
+(<>) :: (H.Product a,
+             sh ~ [ _1 ': __1 ,DOne ': __2 ],
+             MultiplyCxt sh rj ri')
+    => DimMat sh a -> DimMat (rj ': cj) a
+    -> DimMat (ri' ': cj) a
+(<>) = multiply
 
 -- | @(Trans sh1 sh2) =>@ asserts that the two matrices are transposes
 type family Trans (sh1 :: [[*]]) (sh2 :: [[*]]) :: Constraint
