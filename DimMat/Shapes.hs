@@ -98,7 +98,7 @@ type instance ShapeDimensionless (MatrixShape g rs cs) = MatrixShape DOne (MapCo
 -- Should be a closed type family.
 type family ShapeRows (shape :: *) :: *
 
-type instance ShapeRows (MatrixShape g rs cs) = N.S (TListLength rs)
+type instance ShapeRows (MatrixShape g rs cs) = N.S (ListLength rs)
 
 
 -- Define the type-level number of columns in a matrix.
@@ -106,14 +106,14 @@ type instance ShapeRows (MatrixShape g rs cs) = N.S (TListLength rs)
 -- Should be a closed type family.
 type family ShapeCols (shape :: *) :: *
 
-type instance ShapeCols (MatrixShape g rs cs) = N.S (TListLength cs)
+type instance ShapeCols (MatrixShape g rs cs) = N.S (ListLength cs)
 
 
 -- Should be at kind VectorShape -> Nat
 -- Should be a closed type family.
 type family VectorLength (shape :: NonEmpty *) :: *
 
-type instance VectorLength (a :| as) = N.S (TListLength as)
+type instance VectorLength (a :| as) = N.S (ListLength as)
 
 
 -- A constraint for square matrices.
@@ -121,7 +121,19 @@ type instance VectorLength (a :| as) = N.S (TListLength as)
 -- Should be a closed type family.
 type family Square (shape :: *) :: Constraint
 
-type instance Square (MatrixShape g rs cs) = (TListLength rs ~ TListLength cs)
+type instance Square (MatrixShape g rs cs) = (ListLength rs ~ ListLength cs)
+
+
+-- A matrix shape for converting from one vector to another.
+-- This is the shape that, when right-multiplied by a column vector whose shape is from, produces a column vector whose shape is to.
+-- Should be at kind VectorShape -> VectorShape -> MatrixShape
+-- Should be a closed type family.
+type family DivideVectors (to :: NonEmpty *) (from :: NonEmpty *) :: *
+
+type instance DivideVectors (t :| ts) (f :| fs) = MatrixShape 
+                                                    (ListHead (MapDiv (ListHead (f ': fs)) (t ': ts)))
+                                                    (MapDiv (ListHead (f ': fs)) (t ': ts))
+                                                    (MapMul (ListHead (f ': fs)) (MapRecip (f ': fs)))
 
 
 -- Extract the dimension of an element from a shape.
@@ -129,7 +141,7 @@ type instance Square (MatrixShape g rs cs) = (TListLength rs ~ TListLength cs)
 -- Should be a closed type family.
 type family MatrixElement (shape :: *) (row :: *) (col :: *) :: *
 
-type instance MatrixElement (MatrixShape g rs cs) i j = Mul g (Mul (TElementAt rs i) (TElementAt cs j))
+type instance MatrixElement (MatrixShape g rs cs) i j = Mul g (Mul (ElementAt (DOne ': rs) i) (ElementAt (DOne ': cs) j))
 
 
 -- Extract the dimension of an element from a vector shape.
@@ -138,7 +150,7 @@ type instance MatrixElement (MatrixShape g rs cs) i j = Mul g (Mul (TElementAt r
 type family VectorElement (shape :: NonEmpty *) (i :: *) :: *
 
 type instance VectorElement (d :| ds) N.Z = d
-type instance VectorElement (d :| ds) (N.S i) = TElementAt ds i
+type instance VectorElement (d :| ds) (N.S i) = ElementAt ds i
 
 
 
@@ -158,11 +170,38 @@ type instance MapInv (x ': xs) = (Inv x) ': (MapInv xs)
 
 -- Convert all dimensions in a list of dimensions to dimensionless.
 -- Should be at kind [Dim] -> [Dim]
--- Should be a closed type family.s
+-- Should be a closed type family.
 type family MapConstOne (dims :: [*]) :: [*]
 
 type instance MapConstOne '[] = '[]
 type instance MapConstOne (x ': xs) = DOne ': (MapConstOne xs)
+
+
+-- Convert all dimensions to their reciprocal.
+-- Should be at kind [Dim] -> [Dim]
+-- Should be a closed type family.
+type family MapRecip (dims :: [*]) :: [*]
+
+type instance MapRecip '[] = '[]
+type instance MapRecip (x ': xs) = (Inv x ': (MapRecip xs))
+
+
+-- Multiply a list of dimensions by a dimension.
+-- Should be at kind [Dim] -> [Dim]
+-- Should be a closed type family.
+type family MapMul (dim :: *) (dims :: [*]) :: [*]
+
+type instance MapMul d '[] = '[]
+type instance MapMul d (x ': xs) = (Mul d x ': (MapMul d xs))
+
+
+-- Divide a list of dimensions by a dimension.
+-- Should be at kind [Dim] -> [Dim]
+-- Should be a closed type family.
+type family MapDiv (dim :: *) (dims :: [*]) :: [*]
+
+type instance MapDiv d '[] = '[]
+type instance MapDiv d (x ': xs) = (Div d x ': (MapDiv d xs))
 
 
 -- Define the product of a list of dimensions.
@@ -174,20 +213,29 @@ type instance DimProduct '[] = DOne
 type instance DimProduct (a ': as) = Mul a (DimProduct as)
 
 
+-- Get the head of a type-level list.
+-- Should be at kind [k] -> k
+-- Should be a closed type family.
+type family ListHead (xs :: [k]) :: *
+
+type instance ListHead '[] = Void
+type instance ListHead (x ': xs) = x
+
+
 -- Get the length of a type-level list.
 -- Should be at kind [k] -> Nat
 -- Should be a closed type family.
-type family TListLength (xs :: [*]) :: *
+type family ListLength (xs :: [k]) :: *
 
-type instance TListLength '[] = N.Z
-type instance TListLength (x ': xs) = N.S (TListLength xs)
+type instance ListLength '[] = N.Z
+type instance ListLength (x ': xs) = N.S (ListLength xs)
 
 
 -- Get a specified, zero-indexed element from a type-level list.
 -- Should be at kind [k] -> k (except what about the Void case?)
 -- Should be a closed type family.
-type family TElementAt (xs :: [*]) (n :: *) :: *
+type family ElementAt (xs :: [*]) (n :: *) :: *
 
-type instance TElementAt '[] n = Void
-type instance TElementAt (a ': as) N.Z = a
-type instance TElementAt (a ': as) (N.S n) = TElementAt as n
+type instance ElementAt '[] n = Void
+type instance ElementAt (a ': as) N.Z = a
+type instance ElementAt (a ': as) (N.S n) = ElementAt as n
