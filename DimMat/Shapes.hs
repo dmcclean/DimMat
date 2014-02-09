@@ -1,24 +1,21 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
+
 {-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
+
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+
 {-# LANGUAGE UndecidableInstances #-}
 {- | This module only exposes the types and type functions neccessary to express linear algebra, it doesn't actually implement term-level linear algebra.
 -}
 module DimMat.Shapes (
   MatrixShape,
+  VectorShape,
   Product,
   ShapeProduct,
   ShapeTranspose,
@@ -27,19 +24,29 @@ module DimMat.Shapes (
   ShapeDimensionless,
   ShapeRows,
   ShapeCols,
+  Square,
+  MatrixElement,
+  VectorElement,
+  -- row extractor
+  -- column extractor
   ) where
-    
+
 import Data.Void (Void)
 import GHC.Exts (Constraint)
 import Numeric.Units.Dimensional.TF.Prelude
 import Numeric.Units.Dimensional.TF
 import qualified Prelude as P
 import qualified Numeric.NumType.TF as N
+import Data.List.NonEmpty (NonEmpty(..))
 
 -- define a data kind for matrix shapes
 -- a matrix shape is a single global dimension, an n-1 list of row dimesnions, and an m-1 list of column dimensions
 -- Should be at kind Dim -> [Dim] -> [Dim] -> Dim
 data MatrixShape :: * -> [*] -> [*] -> *
+
+-- define a data kind for vector shapes
+-- Should be kinded as a non-empty list of Dim
+type VectorShape = NonEmpty
 
 
 -- Define the type of matrix products.
@@ -101,7 +108,29 @@ type family ShapeCols (shape :: *) :: *
 type instance ShapeCols (MatrixShape g rs cs) = N.S (TListLength cs)
 
 
+-- A constraint for square matrices.
+-- Should be at kind MatrixShape -> Constraint
+-- Should be a closed type family.
+type family Square (shape :: *) :: Constraint
 
+type instance Square (MatrixShape g rs cs) = (TListLength rs ~ TListLength cs)
+
+
+-- Extract the dimension of an element from a shape.
+-- Should be at kind MatrixShape -> Nat -> Nat -> Dim
+-- Should be a closed type family.
+type family MatrixElement (shape :: *) (row :: *) (col :: *) :: *
+
+type instance MatrixElement (MatrixShape g rs cs) i j = Mul g (Mul (TElementAt rs i) (TElementAt cs j))
+
+
+-- Extract the dimension of an element from a vector shape.
+-- Should be at kind VectorShape -> Nat -> Dim
+-- Should be a closed type family.
+type family VectorElement (shape :: NonEmpty *) (i :: *) :: *
+
+type instance VectorElement (d :| ds) N.Z = d
+type instance VectorElement (d :| ds) (N.S i) = TElementAt ds i
 
 
 
