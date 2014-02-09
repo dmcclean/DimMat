@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 tested-with:         GHC==7.6.2
 
 library
-  exposed-modules:     DimMat.Shapes
+  exposed-modules:     DimMat.HMatrix, DimMat.Shapes
   build-depends:       base >=4.6 && <4.7,
                        dimensional-tf >=0.2 && <0.3,
                        hmatrix-syntax >=0.1 && <0.2,
