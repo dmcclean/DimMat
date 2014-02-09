@@ -20,7 +20,7 @@ import DimMat
 import Numeric.Units.Dimensional.TF.Prelude
 import Numeric.Units.Dimensional.TF
 import qualified Prelude as P
-import Text.PrettyPrint.ANSI.Leijen
+import Text.PrettyPrint.ANSI.Leijen hiding ((<>))
 
 
 import qualified Numeric.LinearAlgebra as H
@@ -44,41 +44,6 @@ a23 = (massOfPendulum * massOfPendulum * g * lengthToPendulumCenterOfMass * leng
 a42 = negate (massOfPendulum * lengthToPendulumCenterOfMass * coefficientOfFrictionForCart) / p
 a43 = massOfPendulum * g * lengthToPendulumCenterOfMass*(massOfCart + massOfPendulum)/p
 
-{-
-
->>> inv aSmall `sub` aInvSmall
-2><2     1                      m                     
-s        -8.881784197001252e-16 -2.220446049250313e-16
-m^-1 s^2 0.0                    0.0
-
->>> inv aSmall `multiply` aSmall
-2><2   1                     m s^-1                
-1      1.0                   -6.732461810265988e-15
-m^-1 s 5.014435047745458e-19 0.9999999999999999 
-
--}
-aSmall = [matD| a22, a23; a42, a43 |]
-aInvSmall = scale (_1 / det aSmall)
-    [matD| a43, negate a23; negate a42, a22 |]
-
-{-
->>> cmap (Scale' ((2::Double) *~ second)) aSmall
-2><2 1                    m s^-1            
-1    -0.36363636363636365 5.3454545454545475
-m^-1 -0.9090909090909091  62.36363636363637
-
-alternative to scale. Also more fancy examples (say swap metres and seconds
-powers)...
-
--}
-newtype Scale' f a = Scale' (Quantity f a)
-instance (Num a, a ~ Double,
-          x ~ Quantity d a,
-          y ~ Quantity d' a,
-          MultEq f d d')
-        => ApplyAB (Scale' f a) x y where
-  applyAB (Scale' n) x = n * x
-
 b21 = (massMomentOfInertiaOfPendulum + (massOfPendulum * lengthToPendulumCenterOfMass * lengthToPendulumCenterOfMass)) / p
 b41 = massOfPendulum * lengthToPendulumCenterOfMass / p
 
@@ -97,97 +62,132 @@ u = [matD| (0 :: Double) *~ newton |]
 
 y = [matD| 1 *~ meter; _0 :: Dimensionless Double  |]
 
--- :t isLTI (1 *~ second) x u y, given that x u and y have monomorphic
--- types properly infers constraints on the a,b,c,d arguments!
-isLTI time x u y a b c d =
-    (scale (_1 /time) x `add` multiply a x `add` multiply b u,
-     y `add` multiply c x `add` multiply d u)
+poles sys = let ContinuousLiSystem { a'' = a } = sys
+             in eigenvalues a
 
-testIsLTI =
-  (\ a b c d -> case isLTI (1 *~ second) x u y a b c d of
-   _ -> do
-    print $ vsep
-        [text "A = " </> indent 0 (pretty (zeroes `asTypeOf` a)),
-         text "B = " </> indent 0 (pretty (zeroes `asTypeOf` b)),
-         text "C = " </> indent 0 (pretty (zeroes `asTypeOf` c)),
-         text "D = " </> indent 0 (pretty (zeroes `asTypeOf` d))]
-    ) undefined undefined undefined undefined
+-- this ludicrous context doesn't actually mean anything at all, and is always met for well-kinded systems
+discretizeZeroOrderHold :: (H.Field e,
+                            SameLength (MapDiv (Head xs) xs)
+                                       (MapMul (Head xs) (MapRecip xs)),
+                            SameLength (MapMul (Head xs) (MapRecip xs))
+                                       (MapDiv (Head xs) xs),
+                            AreRecipsList (MapDiv (Head xs) xs)
+                                          (MapMul (Head xs) (MapRecip xs)),
+                            MapMultEq iv (MapDiv (Head xs) (MapDiv iv xs))
+                                         (MapDiv (Head xs) xs),
+                            (MapDiv (Head us) xs) ~ (t1 ': t2),
+                            HNat2Integral (HLength t2),
+                            (MapMul (Head us) (MapRecip us)) ~ (DOne ': t3),
+                            HNat2Integral (HLength t3)
+                           ) => ContinuousLiSystem iv xs ys us e -> Quantity iv e -> DiscreteLiSystem iv xs ys us e
+discretizeZeroOrderHold sys t = let ac = a'' sys
+                                    bc = b'' sys
+                                    ad = expm (scale t (a'' sys))
+                                    --bd = (pinv ac) <> (ad `add` (scale (negate _1) ident)) <> bc
+                                    bd = zeroes
+                                 in DiscreteLiSystem { t''' = t, a''' = ad, b''' = bd, c''' = c'' sys, d''' = d'' sys }
 
+ctrb = let ContinuousLiSystem { a'' = a, b'' = b, c'' = c, d'' = d } = pendulum
+        in [blockD| b, a <> b, a <> a <> b, a <> a <> a <> b |]
 
-{- | data type encoding units required by
-http://en.wikibooks.org/wiki/Control_Systems/State-Space_Equations#State-Space_Equations
+outputctrb = let ContinuousLiSystem { a'' = a, b'' = b, c'' = c, d'' = d } = pendulum
+                 cb = c <> b
+                 cab = c <> a <> b
+                 caab = c <> a <> a <> b
+                 caaab = c <> a <> a <> b
+              in [blockD| cb, cab, caab, caaab, d |]
 
-To refresh:
+obsv = let ContinuousLiSystem { a'' = a, b'' = b, c'' = c, d'' = d } = pendulum
+        in [blockD| c;
+                    c <> a;
+                    c <> a <> a;
+                    c <> a <> a <> a |]
 
-> dxs/dt = A xs + B us
-> ys = C xs + D us
+type family DivideVectors (to :: [*]) (from :: [*]) :: [[*]]
+type instance DivideVectors ts fs = [ MapDiv (Head fs) ts, MapMul (Head fs) (MapRecip fs) ]
 
-the units of d/dt are 1/iv 
--}
-class LiSystem (iv :: *) (xs :: [*]) (ys :: [*]) (us :: [*])
-            (a :: [[*]]) (b :: [[*]]) (c :: [[*]]) (d :: [[*]])
-instance LiSystemCxt dxs iv xs ys us a b c d
-    => LiSystem iv xs ys us a b c d
+data ContinuousLiSystem (iv :: *) (xs :: [*]) (ys :: [*]) (us :: [*]) e = ContinuousLiSystem
+                                                                          {
+                                                                            a'' :: DimMat (DivideVectors (MapDiv iv xs) xs) e,
+                                                                            b'' :: DimMat (DivideVectors (MapDiv iv xs) us) e,
+                                                                            c'' :: DimMat (DivideVectors ys xs) e,
+                                                                            d'' :: DimMat (DivideVectors ys us) e
+                                                                          }
 
-type LiSystemCxt dxs iv xs ys us a b c d =
-   (MultiplyCxt a xs dxs,
-    MultiplyCxt b us dxs,
-    MultiplyCxt c xs ys,
-    MultiplyCxt d us ys,
-    MapMultEq iv dxs xs)
+deriving instance (Show e, 
+                   PPUnits (DivideVectors (MapDiv iv xs) xs),
+                   PPUnits (DivideVectors (MapDiv iv xs) us),
+                   PPUnits (DivideVectors ys xs),
+                   PPUnits (DivideVectors ys us)) => Show (ContinuousLiSystem iv xs ys us e)
 
--- | identity function but constrains types
-isLiTuple :: 
-    (LiSystem iv xs ys us a b c d,
-    t ~ (DimMat a e, DimMat b e, DimMat c e, DimMat d e)) =>
-    t -> t
-isLiTuple x = x
+type ContinuousLtiSystem = ContinuousLiSystem DTime
 
-isExample :: 
-     (LiSystem DTime
-        [DLength, DVelocity, DPlaneAngle, DAngularVelocity]
-        [DLength, DPlaneAngle]
-        '[DForce]
-        a b c d, t ~ (DimMat a e, DimMat b e, DimMat c e, DimMat d e)) => 
-    t -> t
-isExample x = x
+data DiscreteLiSystem (iv :: *) (xs :: [*]) (ys :: [*]) (us :: [*]) e = DiscreteLiSystem
+                                                                        {
+                                                                          t''' :: Quantity iv e,
+                                                                          a''' :: DimMat (DivideVectors xs xs) e,
+                                                                          b''' :: DimMat (DivideVectors xs us) e,
+                                                                          c''' :: DimMat (DivideVectors ys xs) e,
+                                                                          d''' :: DimMat (DivideVectors ys us) e
+                                                                        }
 
-pendulum = isExample (a',b',c',d')
-         where
-           a' = [matD| _0, _1, _0, _0;
-                       _0, a22, a23, _0;
-                       _0, _0, _0, _1;
-                       _0, a42, a43, _0 |]
-           b' = [matD| _0;
-                       b21;
-                       _0;
-                       b41 |]
-           c' = [matD| _1, _0, _0, _0;
-                       _0, _0, _1, _0 |]
-           d' = zeroes
+deriving instance (Show e,
+                   Show iv,
+                   PPUnits (DivideVectors xs xs),
+                   PPUnits (DivideVectors xs us),
+                   PPUnits (DivideVectors ys xs),
+                   PPUnits (DivideVectors ys us)) => Show (DiscreteLiSystem iv xs ys us e)
 
-poles (a,_,_,_) = eigenvalues a
+type DiscreteLtiSystem = DiscreteLiSystem DTime
 
--- causes no problems for AV
-evaluatePendulum = evaluate pendulum
+type SimpleExampleSystem = ContinuousLiSystem DOne
+    '[DOne]
+    '[DOne]
+    '[DOne]
+    Double
 
-evaluate ::
-    ( -- require all matrices to be at least 1x1
-      -- really ought to be part of the MultiplyCxt
-     a ~ [_1 ': _2, DOne ': _3],
-     b ~ [_4 ': _5, DOne ': _6],
-     c ~ [_7 ': _8, DOne ': _9],
-     d ~ [_a ': _b, DOne ': _c],
-     H.Field e,
-     LiSystemCxt dxs iv xs ys us a b c d) =>
-    (DimMat a e, DimMat b e, DimMat c e, DimMat d e)
-    -> DimMat [xs, '[DOne]] e
-    -> DimMat [us, '[DOne]] e
-    -> (DimMat [dxs, '[DOne]] e, DimMat [ys, '[DOne]] e)
-evaluate (a,b,c,d) x u = case (a `multiply` x) `add` (b `multiply` u) of
-    xDot -> case (c `multiply` x) `add` (d `multiply` u) of
-     y -> (xDot, y)
+type ExampleSystem = ContinuousLtiSystem
+    '[DLength, DVelocity, DPlaneAngle, DAngularVelocity]
+    '[DLength, DPlaneAngle]
+    '[DForce]
+    Double
 
+simple = ContinuousLiSystem {
+           a'' = zeroes,
+           b'' = zeroes,
+           c'' = ident,
+           d'' = zeroes
+         } :: SimpleExampleSystem
 
-ctrb = let (a,b,_,_) = pendulum
-        in [blockD| b, a `multiply` b, a `multiply` a `multiply` b, a `multiply` a `multiply` a `multiply` b |]
+pendulum = ContinuousLiSystem {
+           a'' = [matD| _0, _1, _0, _0;
+                        _0, a22, a23, _0;
+                        _0, _0, _0, _1;
+                        _0, a42, a43, _0 |],
+           b'' = [matD| _0;
+                        b21;
+                        _0;
+                        b41 |],
+           c'' = [matD| _1, _0, _0, _0;
+                        _0, _0, _1, _0 |],
+           d'' = zeroes
+         } :: ExampleSystem
+
+--evaluate :: LiSystem iv xs ys us e -> DimMat [xs,'[DOne]] e -> DimMat [us, '[DOne]] e -> (DimMat [(MapDiv iv xs), '[DOne]] e, DimMat [ys, '[DOne]] e)
+evaluate sys x u = let
+                      a = a'' sys
+                      b = b'' sys
+                      c = c'' sys
+                      d = d'' sys
+                      xDot = (a <> x) `add` (b <> u)
+                      y = (c <> x) `add` (d <> u)
+                    in (xDot, y)
+
+evaluateD sys x u = let
+                       a = a''' sys
+                       b = b''' sys
+                       c = c''' sys
+                       d = d''' sys
+                       x' = (a <> x) `add` (b <> u)
+                       y = (c <> x) `add` (d <> u)
+                     in (x', y)
