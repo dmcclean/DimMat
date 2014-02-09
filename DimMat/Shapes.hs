@@ -24,6 +24,7 @@ module DimMat.Shapes (
   ShapeDimensionless,
   ShapeRows,
   ShapeCols,
+  DivideVectors,
   VectorLength,
   Square,
   MatrixElement,
