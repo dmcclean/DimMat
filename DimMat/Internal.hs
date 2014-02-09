@@ -81,7 +81,6 @@ module DimMat.Internal (
    arctan2,
    hconcat,
    vconcat,
-   cmap,
    konst,
    zeroes,
    -- build, atIndex, minIndex, maxIndex, minElement, maxElement,
@@ -563,22 +562,6 @@ arctan2 (DimMat a) (DimMat b) = DimMat (H.arctan2 a b)
 
 equal :: (m ~ DimMat [ri,ci] a) => m -> m -> Bool
 equal (DimMat a) (DimMat b) = H.equal a b
-
-{- | @cmap f m@ gives a matrix @m'@
-
-@f@ is applied to 
-
--}
-class CMap f sh sh' e e' where
-    cmap :: f -> DimMat sh e -> DimMat sh' e'
-instance 
-    (ToHLists sh e xs,
-     FromHLists sh' e' xs',
-     SameLengths [xs,xs'],
-     HMapAux (HMap f) xs xs') =>
-    CMap f sh sh' e e' where
-  cmap f m = fromHLists (HMap f `hMap` (toHLists m :: HList xs) :: HList xs')
-    -- maybe there's a way to implement in terms of the real cmap
 
 {- | the slightly involved type here exists because
 ci1 and ci2 both start with DOne, but ci2's contribution
