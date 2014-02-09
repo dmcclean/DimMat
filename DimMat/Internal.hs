@@ -47,8 +47,6 @@ module DimMat.Internal (
    -- (><),
    trans,
    -- reshape, flatten, fromLists, toLists, buildMatrix,
-   ToHLists(toHLists), toHList,
-   FromHLists(fromHLists), fromHList,
    (@@>),
 
    -- asRow, asColumn, fromRows, toRows, fromColumns, toColumns
@@ -164,10 +162,9 @@ module DimMat.Internal (
    Tail,MapMultEq', AppendEq, MultEq, Append, AppendEq',
    DropPrefix,
    RmDimensional(RmDimensional),
-   AreRecipsList,ToHList,UnDimMat,AllEq,
-   HListFromList,AddDimensional,ToHListRows',
-   ToHListRow,AddQty,
-   HMapOutWith(..),
+   AreRecipsList,UnDimMat,AllEq,
+   AddDimensional,
+   AddQty,
   ) where
 import Foreign.Storable (Storable)      
 import GHC.Exts (Constraint)
@@ -691,75 +688,12 @@ diagBlock :: (db ~ DimMat [ri, DOne ': ci] e,
 diagBlock pairs = DimMat (H.diagBlock (hMapOut UnDimMat pairs))
 #endif
 
-toHList :: forall e e1 ri result.  (ToHList e e1 ri result)
-    => DimMat '[ri] e -> HList result 
-toHList (DimVec v) = case hListFromList (H.toList v) :: HList e1 of
-    e1 -> hMap AddDimensional e1
-
-fromHList :: forall e ri list.
-    (H.Field e,
-     HMapOut RmDimensional list e, ToHListRow ri e list)
-    => HList list -> DimMat '[ri] e
-fromHList xs = DimVec (H.fromList (hMapOut RmDimensional xs))
-
 data RmDimensional = RmDimensional
 instance (x ~ Quantity d y) => ApplyAB RmDimensional x y where
         applyAB _ (Dimensional a) = a
 
 class H.Field e => FromHLists sh e xs where
     fromHLists :: HList xs -> DimMat sh e
-
-instance 
-        (ToHListRows' ri ci e result,
-         HMapOut (HMapOutWith RmDimensional) result [e],
-         SameLengths [ri, result],
-         (HList resultHead ': _2) ~ result,
-         SameLengths [ci, resultHead],
-         ci ~ (DOne ': _1), H.Field e,
-         sh ~ [ri,ci]) =>
-    FromHLists sh e result where
-    fromHLists xs = DimMat (H.fromLists (hMapOut (HMapOutWith RmDimensional) xs))
-
-newtype HMapOutWith f = HMapOutWith f
-instance (HMapOut f l e, es ~ [e], HList l ~ hl) => ApplyAB (HMapOutWith f) hl es where
-    applyAB (HMapOutWith f) = hMapOut f
-
-class ToHLists sh e xs where
-    toHLists :: DimMat sh e -> HList xs
-instance (ToHListsCxt e e1 e2 ri ci xs) => ToHLists [ri,ci] e xs where
-  toHLists (DimMat m) = case hListFromList (map hListFromList (H.toLists m) :: [HList e1]) :: HList e2 of
-    e2 -> hMap (HMap AddDimensional) e2
-
-type ToHList e e1 ri result =
-    (HListFromList e e1,
-     SameLengths [e1,result,ri],
-     HMapAux AddDimensional e1 result,
-     ToHListRow ri e result)
-
-type family ToHListRow (a :: [*]) e (b :: [*]) :: Constraint
-type instance ToHListRow (a ': as) e (b ': bs) = (Quantity a e ~ b, ToHListRow as e bs)
-
--- | performance (compile-time) is pretty bad
-type ToHListsCxt e e1 e2 ri ci result =
-    (HListFromList e e1,
-     HListFromList (HList e1) e2,
-     SameLengths [ci,e1], SameLengths [e2,result,ri],
-     HMapAux (HMap AddDimensional) e2 result,
-     ToHListRows' ri ci e result)
-
-class HListFromList e e' where
-        hListFromList :: [e] -> HList e'
-instance HListFromList e '[] where
-        hListFromList _ = HNil
-instance (e ~ e', HListFromList e es) => HListFromList e (e' ': es) where
-        hListFromList (e : es) = e `HCons` hListFromList es 
-
-class ToHListRows' (ri :: [*]) (ci :: [*]) (e :: *) (rows :: [*])
-instance ToHListRows' '[] ci e '[]
-instance (ToHListRows' ri ci e rows,
-          MapMultEq r ci ci',
-          HMapCxt (AddQty e) (HList ci') hListRow ci' row')
-  => ToHListRows' (r ': ri) ci e (hListRow ': rows)
 
 data AddQty e
 instance (qty ~ Quantity d e) => ApplyAB (AddQty e) d qty
