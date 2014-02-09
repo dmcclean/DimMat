@@ -158,8 +158,8 @@ module DimMat.Internal (
    DimMatFromTuple,
    DimMat(..),
    AtEq, MapMul, Inner, SameLengths, Product, MapRecip,
-   ZipWithZipWithMul, MapMapConst, CanAddConst, PPUnits,
-   PPUnits', Head, MapDiv, AreRecips, ZipWithMul, PairsToList,
+   ZipWithZipWithMul, MapMapConst, CanAddConst,
+   Head, MapDiv, AreRecips, ZipWithMul, PairsToList,
    DiagBlock, MapConst, SameLength', AppendShOf,
    MultiplyCxt, MapMultEq, Trans,
    Tail,MapMultEq', AppendEq, MultEq, Append, AppendEq',
@@ -201,6 +201,8 @@ data DimMat (sh :: [[*]]) a where
      DimVec :: (H.Container H.Vector a, H.Field a)
         => H.Vector a -> DimMat '[sh] a
 
+
+{-
 -- very crude
 instance (Show a, PPUnits sh) => Pretty (DimMat sh a) where
     pretty (DimVec v) = case ppUnits (proxy :: Proxy sh) of
@@ -245,6 +247,8 @@ instance (Show x, PPUnits' xs) => PPUnits' (x ': xs) where
     ppUnits' _ = show (error "ppUnits'" :: x) : ppUnits' (error "ppUnits'" :: Proxy xs)
 instance PPUnits' '[] where
     ppUnits' _ = []
+
+-}
 -- | put the DimMat into a canonical form, which has a DOne as the first
 -- element of the colUnits (2nd) list. Instances for kinds @*@ and @* -> *@
 -- 

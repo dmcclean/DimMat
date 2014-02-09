@@ -114,11 +114,13 @@ data ContinuousLiSystem (iv :: *) (xs :: [*]) (ys :: [*]) (us :: [*]) e = Contin
                                                                             d'' :: DimMat (DivideVectors ys us) e
                                                                           }
 
+{-
 deriving instance (Show e, 
                    PPUnits (DivideVectors (MapDiv iv xs) xs),
                    PPUnits (DivideVectors (MapDiv iv xs) us),
                    PPUnits (DivideVectors ys xs),
                    PPUnits (DivideVectors ys us)) => Show (ContinuousLiSystem iv xs ys us e)
+-}
 
 type ContinuousLtiSystem = ContinuousLiSystem DTime
 
@@ -131,12 +133,14 @@ data DiscreteLiSystem (iv :: *) (xs :: [*]) (ys :: [*]) (us :: [*]) e = Discrete
                                                                           d''' :: DimMat (DivideVectors ys us) e
                                                                         }
 
+{-
 deriving instance (Show e,
                    Show iv,
                    PPUnits (DivideVectors xs xs),
                    PPUnits (DivideVectors xs us),
                    PPUnits (DivideVectors ys xs),
                    PPUnits (DivideVectors ys us)) => Show (DiscreteLiSystem iv xs ys us e)
+-}
 
 type DiscreteLtiSystem = DiscreteLiSystem DTime
 
