@@ -22,14 +22,14 @@ module DimMat.Shapes (
   ShapeInverse,
   ShapeDeterminant,
   ShapeDimensionless,
-  --ShapeRows,
-  --ShapeCols,
+  ShapeRows,
+  ShapeCols,
+  VectorLength,
   Square,
   MatrixElement,
   VectorElement,
   -- row extractor
   -- column extractor
-  TListLength,
   ) where
 
 import Data.Void (Void)
@@ -93,7 +93,6 @@ type family ShapeDimensionless (shape :: *) :: *
 type instance ShapeDimensionless (MatrixShape g rs cs) = MatrixShape DOne (MapConstOne cs) (MapConstOne cs)
 
 
-{-
 -- Define the type-level number of rows in a matrix.
 -- Should be at kind MatrixShape -> Nat
 -- Should be a closed type family.
@@ -108,7 +107,13 @@ type instance ShapeRows (MatrixShape g rs cs) = N.S (TListLength rs)
 type family ShapeCols (shape :: *) :: *
 
 type instance ShapeCols (MatrixShape g rs cs) = N.S (TListLength cs)
--}
+
+
+-- Should be at kind VectorShape -> Nat
+-- Should be a closed type family.
+type family VectorLength (shape :: NonEmpty *) :: *
+
+type instance VectorLength (a :| as) = N.S (TListLength as)
 
 
 -- A constraint for square matrices.

@@ -37,8 +37,8 @@ import DimMat.Shapes
 -- define a type for matrices
 -- Should be at kind MatrixShape -> * -> *
 data Matrix shape e where
-  Matrix :: (H.Container H.Matrix e, H.Field e, N.NumType (TListLength rs), N.NumType (TListLength cs))
-         => H.Matrix e -> Matrix (MatrixShape g rs cs) e
+  Matrix :: (H.Container H.Matrix e, H.Field e, N.NumType (ShapeRows shape), N.NumType (ShapeCols shape))
+         => H.Matrix e -> Matrix shape e
 
 -- define a type for vectors
 -- Should be at kind VectorShape -> * -> *
@@ -46,8 +46,11 @@ data Vector shape e where
   Vector :: (H.Container H.Vector e, H.Field e)
          => H.Vector e -> Vector shape e
 
-
-zeroes :: forall g rs cs e.(H.Field e, N.NumType (TListLength rs), N.NumType (TListLength cs)) => Matrix (MatrixShape g rs cs) e
+-- a matrix of zeroes
+zeroes :: forall shape e.(H.Field e, N.NumType (ShapeRows shape), N.NumType (ShapeCols shape)) => Matrix shape e
 zeroes = Matrix (H.konst 0
-        (N.toNum (undefined :: TListLength rs),
-         N.toNum (undefined :: TListLength cs)))
+        (N.toNum (undefined :: ShapeRows shape),
+         N.toNum (undefined :: ShapeCols shape)))
+
+zeroesV :: forall shape e.(H.Field e, N.NumType (VectorLength shape)) => Vector shape e
+zeroesV = Vector (H.constant 0 (N.toNum (undefined :: VectorLength shape)))
