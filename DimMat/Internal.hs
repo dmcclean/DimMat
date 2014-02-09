@@ -249,14 +249,6 @@ instance PPUnits' '[] where
     ppUnits' _ = []
 
 -}
--- | put the DimMat into a canonical form, which has a DOne as the first
--- element of the colUnits (2nd) list. Instances for kinds @*@ and @* -> *@
--- 
--- should not be needed, since the GADT does not allow making non-canonical
--- DimMats
-type family Canon (a :: k) :: k
-type instance Canon (DimMat [r,c]) = DimMat [MapMul (Head c) r, MapDiv (Head c) c]
-type instance Canon (DimMat [r,c] x) = DimMat [MapMul (Head c) r, MapDiv (Head c) c] x
 
 -- | @\\a xs -> map (map (const a)) xs@
 type family MapMapConst (a::k) (xs :: [[l]]) :: [[k]]
