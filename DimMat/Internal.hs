@@ -156,15 +156,12 @@ module DimMat.Internal (
    DimMat(..),
    AtEq, MapMul, Inner, SameLengths, Product, MapRecip,
    ZipWithZipWithMul, MapMapConst, CanAddConst,
-   Head, MapDiv, AreRecips, ZipWithMul, PairsToList,
-   DiagBlock, MapConst, SameLength', AppendShOf,
+   Head, MapDiv, AreRecips, ZipWithMul, 
+   MapConst, SameLength',
    MultiplyCxt, MapMultEq, Trans,
    Tail,MapMultEq', AppendEq, MultEq, Append, AppendEq',
    DropPrefix,
-   RmDimensional(RmDimensional),
-   AreRecipsList,UnDimMat,AllEq,
-   AddDimensional,
-   AddQty,
+   AreRecipsList,AllEq,
   ) where
 import Foreign.Storable (Storable)      
 import GHC.Exts (Constraint)
@@ -688,28 +685,6 @@ diagBlock :: (db ~ DimMat [ri, DOne ': ci] e,
 diagBlock pairs = DimMat (H.diagBlock (hMapOut UnDimMat pairs))
 #endif
 
-data RmDimensional = RmDimensional
-instance (x ~ Quantity d y) => ApplyAB RmDimensional x y where
-        applyAB _ (Dimensional a) = a
-
-class H.Field e => FromHLists sh e xs where
-    fromHLists :: HList xs -> DimMat sh e
-
-data AddQty e
-instance (qty ~ Quantity d e) => ApplyAB (AddQty e) d qty
-
-data AddDimensional = AddDimensional
-instance (Quantity t x ~ y) => ApplyAB AddDimensional x y where
-        applyAB _ x = Dimensional x
-
-data UnDimMat = UnDimMat
-instance (DimMat sh a ~ x, H.Matrix a ~ y) => ApplyAB UnDimMat x y where
-        applyAB _ (DimMat x) = x
-
-class DiagBlock (bs :: [*]) t
-instance (DiagBlock as as', AppendShOf a as' ~ t) => DiagBlock (a ': as) t 
-instance (a ~ a') => DiagBlock '[a] a'
-
 type family Append (a :: [k]) (b :: [k]) :: [k]
 type instance Append (a ': as) b = a ': Append as b
 type instance Append '[] b = b
@@ -729,21 +704,6 @@ type AppendEq a b ab =
 type family DropPrefix (a :: [k]) (ab :: [k2]) :: [k2]
 type instance DropPrefix (a ': as) (a' ': abs) = DropPrefix as abs
 type instance DropPrefix '[] bs = bs
-
--- | rework to follow AppendEq?
-type family AppendDims (sh :: [[*]]) (sh' :: [[*]]) :: [[*]]
-type instance AppendDims [a,b] [c,d] = [Append a c, Append b d]
-type instance AppendDims '[a] '[b] = '[Append a b]
-
-type family AppendShOf (a :: *) (b :: *) :: *
-type instance AppendShOf (DimMat sh t) (DimMat sh' t) = DimMat (AppendDims sh sh') t
-
-class PairsToList a t where
-        pairsToList :: a -> [H.Matrix t]
-instance PairsToList () t where
-        pairsToList _ = []
-instance (PairsToList b t, t' ~ t) => PairsToList (DimMat sh t',b) t where
-        pairsToList (DimMat a,b) = a : pairsToList b
 
 type family EigCxt (sh :: [[*]]) (eigenValue  :: [*]) (eigenVector  :: k) :: Constraint
 
