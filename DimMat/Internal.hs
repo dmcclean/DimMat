@@ -153,10 +153,6 @@ module DimMat.Internal (
    -- ** Misc
    -- ** Util 
 
-   -- * Automatic Differentiation
-   -- $ad
-   diff,
-
    -- * actually internal
    toDM,
    DimMatFromTuple,
@@ -176,8 +172,6 @@ module DimMat.Internal (
   ) where
 import Foreign.Storable (Storable)      
 import GHC.Exts (Constraint)
-import qualified Numeric.AD as AD
-import qualified Numeric.AD.Types as AD
 import Numeric.Units.Dimensional.TF.Prelude
 import Numeric.Units.Dimensional.TF
 import qualified Prelude as P
@@ -190,44 +184,6 @@ import Text.PrettyPrint.ANSI.Leijen hiding ((<>))
 import Data.List (transpose)
 
 import Data.HList.CommonMain hiding (MapFst)
-
-{- |
->>> let ke velocity = velocity*velocity*(1*~kilo gram)
->>> diff ke (3 *~ (metre/second))
-6.0 m^-1 kg^-1 s
-
--}
-diff :: (Num a) =>
-        (forall s. AD.Mode s => Dimensional v x (AD.AD s a)
-                             -> Dimensional v y (AD.AD s a))
-        -> Dimensional v x a -> Dimensional v (Div x y) a
-diff f z = Dimensional $ AD.diff (unD . f . Dimensional) (unD z)
-    where unD (Dimensional a) = a
-
-
-{- $ad
-
-TODO: gradients, hessians, etc.
-
-Types for derivative towers can see hlist's @HList\/Data\/HList\/broken\/Lazy.hs@
-
-Complications include the fact that AD.grad needs a traversable,
-but hmatrix stuff is not traversable (due needing Storable). In ipopt-hs
-I got around this problem by copying data. Perhaps that is the solution?
-
-> BROKEN
-> grad :: (Num a, AreRecips i iinv, H.Element a, Storable a,
->           MapMultEq o iinv r) =>
->         (forall s. (AD.Mode s, H.Container H.Vector (AD.AD s a),
->                     Storable (AD.AD s a), H.Field (AD.AD s a))
->                 => DimMat '[i] (AD.AD s a)
->                 -> Quantity o (AD.AD s a))
->      -> DimMat '[i] a
->      -> DimMat '[r] a
-> grad f (DimVec x) = DimMat (H.fromLists [AD.grad (unQty . f . DimVec . H.fromList) (H.toList x)])
->     where unQty (Dimensional a) = a
--}
-
 
 {- | Matrix with statically checked units (and dimensions). This wraps up
 HMatrix. The `sh` type parameter here contains @[row,column]@ units.
